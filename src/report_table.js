@@ -480,6 +480,41 @@ looker.plugins.visualizations.add({
       .append('div')
       .attr('id', 'visContainer')
 
+    d3.select('#visContainer')
+        .append('div')
+        .attr('id', 'exportDiv')
+
+
+    d3.select('#visContainer')
+        .append('button')
+        .attr('id', 'exportButton')
+        .attr('name', 'exportButton')
+        .html('Export')
+        .on('click', function() {
+          var table = document.getElementById('reportTable');
+
+          var newWindow = window.open();
+
+            newWindow.document.write('<html>\n' +
+                '<head>' +
+                '<script lang="javascript" src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>' +
+                '<script lang="javascript" src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>' +
+                '\n' +
+                '</head>' +
+                '<body onload="myFunction()">\n' +
+                '<button id="myButton">Download</button>\n' +
+
+                '<div id="content">\n' +
+                '<table id="financeTable">' +
+                table.innerHTML +
+                '</table></div>\n' +
+                '<script lang="javascript" src="https://localhost:4443/download_tab.js"></script>' +
+                '</body>\n' +
+                '</html>');
+        })
+
+
+
     if (typeof config.columnOrder === 'undefined') {
       this.trigger('updateConfig', [{ columnOrder: {} }])
     }
