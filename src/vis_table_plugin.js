@@ -269,14 +269,25 @@ class VisPluginTableModel {
 
     this.checkVarianceCalculations()
     if (this.useIndexColumn) { this.addIndexColumn(queryResponse) }
-    if (this.hasSubtotals) { this.checkSubtotalsData(queryResponse) }
+    if (this.hasSubtotals) {
+      for (var g = this.addSubtotalDepth; g > 0; g--) {
+        this.checkSubtotalsData(queryResponse, g)
+      }
+
+    }
 
     this.addRows(lookerData)
     this.addColumnSeries()
 
     if (this.hasTotals) { this.buildTotals(queryResponse) }
     if (this.spanRows) { this.setRowSpans() }
-    if (this.addRowSubtotals) { this.addSubTotals() }
+    if (this.addRowSubtotals) {
+      this.addSubTotals()
+      // for (var g = this.addSubtotalDepth; g > 0; g--) {
+        // this.addSubTotals(g)
+      // }
+
+    }
     // console.log('table in progress', this)
     if (this.addColSubtotals && this.pivot_fields.length === 2) { this.addColumnSubTotals() }
     // console.log('addColumnSubTotals() complete')
@@ -531,6 +542,7 @@ class VisPluginTableModel {
       var column = new Column(newDimension.name, this, newDimension) 
       column.idx = col_idx
       column.sort.push({name: 'section', value: 0})
+      column.subtotal = true
       this.headers.forEach(header => {
         switch (header.type) {
           case 'pivot0':
@@ -865,9 +877,11 @@ class VisPluginTableModel {
    * this.subtotals_data
    * @param {*} queryResponse 
    */
-  checkSubtotalsData(queryResponse) {
-    if (typeof queryResponse.subtotals_data[this.addSubtotalDepth] !== 'undefined') {
-      queryResponse.subtotals_data[this.addSubtotalDepth].forEach(lookerSubtotal => {
+  checkSubtotalsData(queryResponse, depth) {
+    // if (typeof queryResponse.subtotals_data[this.addSubtotalDepth] !== 'undefined') {
+    //   queryResponse.subtotals_data[this.addSubtotalDepth].forEach(lookerSubtotal => {
+    if (typeof queryResponse.subtotals_data[depth] !== 'undefined') {
+    queryResponse.subtotals_data[depth].forEach(lookerSubtotal => {
         var visSubtotal = new Row('subtotal')
 
         visSubtotal['$$$__grouping__$$$'] = lookerSubtotal['$$$__grouping__$$$']
@@ -1200,7 +1214,7 @@ class VisPluginTableModel {
       var leaf = leaves[l]
 
       // Totals/subtotals rows: full reset and continue
-      if (leaf.type !== 'line_item' ) {
+      if (leaf.type !== 'line_item' && leaf.type !== 'subtotal' ) {
         tiers.forEach(tier => {
           span_tracker[tier.name] = 1
         })
@@ -1252,20 +1266,34 @@ class VisPluginTableModel {
    *            // This is a gap in functionality. Ideally subtotal would replicate the logic that generated
    *            // the string values in the line items.
    */
-  addSubTotals () { 
-    var depth = this.addSubtotalDepth
+  addSubTotals (depth) {
+    depth = this.addSubtotalDepth
 
     // BUILD GROUPINGS / SORT VALUES
     var subTotalGroups = []
     var latest_group = []
     this.data.forEach((row, i) => {    
-      if (row.type !== 'total') {
+      if (row.type !== 'total' && row.type !== 'subtotal') {
         var group = []
         for (var g = 0; g < depth; g++) {
           var dim = this.dimensions[g].name
           group.push(row.data[dim].value)
         }
         if (group.join('|') !== latest_group.join('|')) {
+
+
+          for(var count = group.length - 2; count >= 0; count--) {
+            if(latest_group.length !== 0 && latest_group[count] != group[count]) {
+              var additional_group = [];
+              for(var counter = 0; counter <= count; counter ++) {
+                additional_group.push(latest_group[counter]);
+              }
+              if(subTotalGroups.indexOf(additional_group) === -1) { subTotalGroups.push(additional_group); }
+
+            } else {
+              break;
+            }
+          }
           subTotalGroups.push(group)
           latest_group = group
         }
@@ -1289,12 +1317,18 @@ class VisPluginTableModel {
 
       this.columns.forEach(column => {
         if (column.modelField.type === 'dimension') {
-          if ([this.firstVisibleDimension, '$$$_index_$$$'].includes(column.id)) {
+          const colPos = this.dimensions.findIndex(object => {return object.name === column.id;});
+          if (colPos === depth) {
             var rowspan = 1
-            var colspan = this.useIndexColumn ? 1 : this.dimensions.filter(d => !d.hide).length
+            var colspan = 1
           } else {
-            var rowspan = -1
-            var colspan = -1
+            if(colPos < depth) {
+              var rowspan = 1
+              var colspan = 1
+            } else {
+              var rowspan = -1
+              var colspan = -1
+            }
           }
           var cell_style = column.modelField.is_numeric ? ['total', 'subtotal', 'numeric', 'dimension'] : ['total', 'subtotal', 'nonNumeric', 'dimension']
           var cell = new DataCell({ 
@@ -1305,12 +1339,20 @@ class VisPluginTableModel {
             colid: column.id,
             rowid: subtotalRow.id
           })
-          if (column.id === '$$$_index_$$$' || column.id === this.firstVisibleDimension ) {
+          if (colPos === subTotalGroup.length ) {
             if (this.genericLabelForSubtotals) {
               cell.value = 'Subtotal'
               cell.rendered = 'Subtotal'
             } else {
               cell.value = subTotalGroup.join(' | ') ? subTotalGroup.join(' | ') : 'Others'
+              cell.rendered = cell.value
+            }
+          } else {
+            if(colPos < depth) {
+              cell.value = subTotalGroup[colPos]
+              cell.rendered = cell.value
+            } else {
+              cell.value = ''
               cell.rendered = cell.value
             }
           }
@@ -1319,7 +1361,7 @@ class VisPluginTableModel {
 
         if (column.modelField.type == 'measure') {
           var cell_style = column.modelField.is_numeric ? ['total', 'subtotal', 'numeric', 'measure'] : ['total', 'subtotal', 'nonNumeric', 'measure']
-          var align = column.modelField.is_numeric ? 'right' : 'left'
+          var align = column.modelField.is_numeric ? 'left' : 'right'
           if (Object.entries(this.subtotals_data).length > 0 && !subtotalRow.id.startsWith('Subtotal|Others')) { // if subtotals already provided in Looker's queryResponse
             var cell = new DataCell({ 
               ...subtotalRow.data[column.id], 

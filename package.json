@@ -1,5 +1,5 @@
 {
-  "name": "vis-report_table",
+  "name": "downloadable-report-with-subtotal",
   "version": "1.0.0",
   "description": "Report table designed for single-page printing with focus on financial report look'n'feel",
   "main": "index.js",
@@ -16,7 +16,8 @@
   "dependencies": {
     "d3": "^5.16.0",
     "lodash": "^4.17.20",
-    "ssf": "^0.11.0"
+    "ssf": "^0.11.0",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     "build": "webpack",
