@@ -508,7 +508,25 @@ looker.plugins.visualizations.add({
                 '<table id="financeTable">' +
                 table.innerHTML +
                 '</table></div>\n' +
-                '<script lang="javascript" src="https://localhost:4443/download_tab.js"></script>' +
+                // '<script lang="javascript" src="https://localhost:4443/download_tab.js"></script>' +
+                '<script>' +
+                'var table = document.getElementById(\'financeTable\');\n' +
+                '    var wb = XLSX.utils.table_to_book(table);\n' +
+                '    \n' +
+                '\n' +
+                '    var wbout = XLSX.write(wb, {bookType:\'xlsx\',  type: \'binary\'});\n' +
+                '    var buf = new ArrayBuffer(wbout.length); //convert s to arrayBuffer\n' +
+                '    var view = new Uint8Array(buf);  //create uint8array as viewer\n' +
+                '    for (var i=0; i<wbout.length; i++) view[i] = wbout.charCodeAt(i) & 0xFF; //convert to octet\n' +
+                '\n' +
+                '    var file = new Blob([buf], {type: \'application/octet-stream\'});\n' +
+                '\n' +
+                '    var a = document.createElement("a"), url = URL.createObjectURL(file);\n' +
+                '    a.href = url;\n' +
+                '    a.download = "report.xls" \n' +
+                '    a.target="_blank"\n' +
+                '    document.body.appendChild(a);\n' +
+                '    a.click();</script>' +
                 '</body>\n' +
                 '</html>');
         })
